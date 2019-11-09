@@ -2,6 +2,9 @@ import collections
 import toolz
 import numpy as np
 import pysam
+import matplotlib.pyplot as plt
+import itertools
+
 """
 SNPs in single cell 10x data
 """
@@ -17,6 +20,17 @@ def parse_chromium_bamread_metadata(alignment:pysam.AlignedSegment):
     readname = alignment.query_name
     return readname, cellbarcode, umi
 
+
+def pysam_reference_coordinate_2_query_coordinate(alignment, ref_coordinate):
+    """
+    its non-trivial to get the index/base in a query corresponing to a given genomic coordinate,
+    because of indels etc.
+    """
+    _tmp = [qcoord for qcoord,rcoord in alignment.get_aligned_pairs() if rcoord == ref_coordinate]
+    assert len(_tmp)==1
+    _tmp=_tmp[0]
+    return _tmp
+
 def get_bases_at_genomic_position(chrom:str, start:int, bamfile:pysam.AlignmentFile):
     """
     for each read covering the given position,
@@ -27,11 +41,11 @@ def get_bases_at_genomic_position(chrom:str, start:int, bamfile:pysam.AlignmentF
     for alignment in bamfile.fetch(chrom, start,start+1):
         n_reads+=1
         if start in alignment.get_reference_positions():
+
             if alignment.has_tag('CB') and alignment.has_tag('UB'):
                 readname, cellbarcode, umi = parse_chromium_bamread_metadata(alignment)
-
-                base_index = alignment.get_reference_positions().index(start) # this is the position of the base in the query sequence (due to .index())
-                base = alignment.query_alignment_sequence[base_index]
+                base_index = pysam_reference_coordinate_2_query_coordinate(alignment, start)
+                base = alignment.query_sequence[base_index]
 #                 reference_base = alignment.reference_alignment_sequence[base_index]
     #             print(base)
                 reads_covering_position.append((readname, cellbarcode,umi, base))
