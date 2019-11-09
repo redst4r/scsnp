@@ -92,7 +92,7 @@ def quantify_SNP_in_position(chrom:str, pos:int, bamfile:pysam.AlignmentFile):
     return cell_dict
 
 
-def annotate_snp_2_adata(adata, chrom:str, pos:int, bam:pysam.AlignmentFile, refbase:str):
+def annotate_snp_2_adata(adata, chrom:str, pos:int, bam:pysam.AlignmentFile, refbase:str, verbose=True):
     """
     adds the SNP-status to the .obs dataframe of each cell
 
@@ -124,7 +124,7 @@ def annotate_snp_2_adata(adata, chrom:str, pos:int, bam:pysam.AlignmentFile, ref
     adata.obs[snp_field_coverage] = 0
 
 
-    unknown_cells = [] # keep track of cells where we called a mutation but its not part of the adata
+    unknown_cells = [] # cells we called a mutation but not part of adata
     # iterate over all cells that have a read at the locus
     for CB, base_list in the_dict.items():
         if CB not in adata.obs_names:
@@ -137,10 +137,18 @@ def annotate_snp_2_adata(adata, chrom:str, pos:int, bam:pysam.AlignmentFile, ref
         adata.obs.loc[CB, snp_field] = genotype
         adata.obs.loc[CB, snp_field_ALT] = n_alt_alleles
         adata.obs.loc[CB, snp_field_coverage] = len(base_list)
-    
-    if unknown_cells:
-        print('Cells not in the adata:')
-        print(' '.join(unknown_cells))
+
+    if unknown_cells and verbose:
+        print(f'{len(unknown_cells)} cells not in the adata:')
+        print(' '.join(unknown_cells) if len(unknown_cells) < 10 else ' '.join(unknown_cells[:10]) + '...')
+
+    adata.obs[snp_field] = adata.obs[snp_field].astype('category')
+
+
+
+
+
+
 
 """
 do to speed considerations, we cant really go base by base (for each base, we
