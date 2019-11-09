@@ -31,10 +31,11 @@ def pysam_reference_coordinate_2_query_coordinate(alignment, ref_coordinate):
     _tmp=_tmp[0]
     return _tmp
 
-def get_bases_at_genomic_position(chrom:str, start:int, bamfile:pysam.AlignmentFile):
+def get_bases_at_genomic_position(chrom:str, start:int, bamfile:pysam.AlignmentFile, ignore_softclipped=True):
     """
     for each read covering the given position,
     return readname, cell-barcode, umi and base
+    ignore_softclipped: if the base of the read at the locus is softclipped, should we still return the read? (usually not as the base is not really aligned)
     """
     n_reads = 0
     reads_covering_position = []
@@ -44,10 +45,22 @@ def get_bases_at_genomic_position(chrom:str, start:int, bamfile:pysam.AlignmentF
 
             if alignment.has_tag('CB') and alignment.has_tag('UB'):
                 readname, cellbarcode, umi = parse_chromium_bamread_metadata(alignment)
+
                 base_index = pysam_reference_coordinate_2_query_coordinate(alignment, start)
+
+                if ignore_softclipped:
+                    def cigar2str(a):
+                        "just spells out the cigar for each base, ie a 124BP read gets a 124CIGAR string"
+                        tmp = [[symbol]*freq for symbol, freq in  a.cigar]
+                        return "".join(str(_) for _ in itertools.chain(*tmp))
+                    cig = cigar2str(alignment)
+                    if cig[base_index] == '4':  # $ is the code for softclipped
+                        continue
+
+                if alignment.is_duplicate or alignment.is_qcfail or alignment.is_secondary or alignment.mapping_quality!=255: # 255 mean uniquly mapped in STAR
+                    continue
+
                 base = alignment.query_sequence[base_index]
-#                 reference_base = alignment.reference_alignment_sequence[base_index]
-    #             print(base)
                 reads_covering_position.append((readname, cellbarcode,umi, base))
     return reads_covering_position
 
